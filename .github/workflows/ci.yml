@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        perl: ['5.30', '5.38']
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install Perl
+        uses: perl-actions/install-with-cpanm@stable
+        with:
+          perl-version: ${{ matrix.perl }}
+      - name: Install project dependencies
+        run: cpanm --installdeps --with-develop .
+      - name: Run tests
+        run: prove -Ilib -v
+      - name: Check Perl syntax
+        run: |
+          perl -Ilib -c lib/Triweave/Diff.pm
+          perl -Ilib -c lib/Triweave.pm
+          perl -Ilib -c lib/Triweave/Patch.pm
+          perl -Ilib -c bin/triweave

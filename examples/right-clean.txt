@@ -1,0 +1,4 @@
+The quick brown hound
+jumps over the sleepy dog.
+Owner: core-team
+Status: ready

@@ -1,0 +1,4 @@
+The swift brown fox
+jumps over the lazy dog.
+Owner: core-team
+Status: ready

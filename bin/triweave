@@ -1,0 +1,110 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use FindBin qw($Bin);
+use Getopt::Long qw(GetOptionsFromArray);
+use lib "$Bin/../lib";
+use Triweave qw(merge_files);
+use Triweave::Patch;
+
+my $command = shift @ARGV || '';
+my $exit_code = eval {
+    if ($command eq 'merge') {
+        _merge(@ARGV);
+    } elsif ($command eq 'patch') {
+        my $action = shift @ARGV || '';
+        $action eq 'write' ? _patch_write(@ARGV)
+            : $action eq 'apply' ? _patch_apply(@ARGV)
+            : die _usage();
+    } else {
+        die _usage();
+    }
+    0;
+};
+
+if ($@) {
+    my $error = $@;
+    $error =~ s/\s+\z//;
+    print STDERR "triweave: $error\n";
+    exit 1;
+}
+exit $exit_code;
+
+sub _merge {
+    my (@args) = @_;
+    my ($base, $left, $right, $output, $help);
+    GetOptionsFromArray(\@args,
+        'base=s'   => \$base,
+        'left=s'   => \$left,
+        'right=s'  => \$right,
+        'output=s' => \$output,
+        'help'     => \$help,
+    ) or die _usage();
+    die _usage() if $help || @args || !defined $base || !defined $left
+        || !defined $right || !defined $output;
+
+    my $result = merge_files($base, $left, $right, $output);
+    my $status = $result->{clean}
+        ? 'clean merge'
+        : $result->{conflicts} . ($result->{conflicts} == 1 ? ' conflict' : ' conflicts');
+    print "$status written to $output\n";
+    exit 2 if $result->{conflicts};
+}
+
+sub _patch_write {
+    my (@args) = @_;
+    my ($base, $changed, $output, $help);
+    GetOptionsFromArray(\@args,
+        'base=s'    => \$base,
+        'changed=s' => \$changed,
+        'output=s'  => \$output,
+        'help'      => \$help,
+    ) or die _usage();
+    die _usage() if $help || @args || !defined $base || !defined $changed || !defined $output;
+    my $patch = Triweave::Patch->from_text(_read($base), _read($changed));
+    $patch->write_file($output);
+    print "patch written to $output\n";
+}
+
+sub _patch_apply {
+    my (@args) = @_;
+    my ($base, $patch_path, $output, $help);
+    GetOptionsFromArray(\@args,
+        'base=s'   => \$base,
+        'patch=s'  => \$patch_path,
+        'output=s' => \$output,
+        'help'     => \$help,
+    ) or die _usage();
+    die _usage() if $help || @args || !defined $base || !defined $patch_path || !defined $output;
+    my $patch = Triweave::Patch->parse(_read($patch_path));
+    _write($output, $patch->apply_to_text(_read($base)));
+    print "patched file written to $output\n";
+}
+
+sub _read {
+    my ($path) = @_;
+    open my $handle, '<:raw', $path or die "cannot read $path: $!";
+    local $/;
+    my $content = <$handle>;
+    close $handle or die "cannot close $path: $!";
+    return defined $content ? $content : '';
+}
+
+sub _write {
+    my ($path, $content) = @_;
+    open my $handle, '>:raw', $path or die "cannot write $path: $!";
+    print {$handle} $content or die "cannot write $path: $!";
+    close $handle or die "cannot close $path: $!";
+}
+
+sub _usage {
+    return <<'USAGE';
+Usage:
+  triweave merge --base BASE --left LEFT --right RIGHT --output OUTPUT
+  triweave patch write --base BASE --changed CHANGED --output PATCH
+  triweave patch apply --base BASE --patch PATCH --output OUTPUT
+
+A merge exits with status 2 when it writes conflict markers.
+USAGE
+}

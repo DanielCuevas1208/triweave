@@ -1,0 +1,6 @@
+* text=auto
+*.pl text eol=lf
+*.pm text eol=lf
+*.t text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
