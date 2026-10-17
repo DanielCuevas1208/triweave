@@ -128,13 +128,20 @@ sub _merge_segments {
             push @merged, @right_segment;
         } elsif (_same_sequence(\@right_segment, \@base_segment)) {
             push @merged, @left_segment;
-        } elsif ($allow_word_merge && @base_segment == 1
-            && @left_segment == 1 && @right_segment == 1) {
-            my $word_merge = _merge_word_line(
-                $base_segment[0], $left_segment[0], $right_segment[0]
-            );
-            if (defined $word_merge) {
-                push @merged, $word_merge;
+        } elsif ($allow_word_merge && @base_segment > 0
+            && @left_segment == @base_segment
+            && @right_segment == @base_segment) {
+            my @word_merged;
+            my $all_clean = 1;
+            for my $index (0 .. $#base_segment) {
+                my $line = _merge_word_line(
+                    $base_segment[$index], $left_segment[$index], $right_segment[$index]
+                );
+                if (!defined $line) { $all_clean = 0; last; }
+                push @word_merged, $line;
+            }
+            if ($all_clean) {
+                push @merged, @word_merged;
             } else {
                 $conflicts++;
                 push @merged, _conflict_block(
